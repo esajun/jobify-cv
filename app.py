@@ -1,4 +1,5 @@
 
+import json
 import streamlit as st
 
 from auth import (
@@ -20,14 +21,8 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-        [data-testid="stSidebarNav"] {
-            display: none;
-        }
-
-        [data-testid="stSidebar"] {
-            display: none;
-        }
-
+        [data-testid="stSidebarNav"],
+        [data-testid="stSidebar"],
         [data-testid="collapsedControl"] {
             display: none;
         }
@@ -43,138 +38,149 @@ st.markdown(
 )
 
 
-
-
 # ==================================================
-# PEMROSESAN LINK RESET PASSWORD DARI SUPABASE
+# PEMROSESAN LINK RESET PASSWORD
 # ==================================================
 
-import streamlit.components.v1 as components
-
-# Supabase mengirim token recovery melalui URL fragment (#...)
-# Ubah fragment menjadi parameter sementara agar dapat dibaca
-# oleh Python Streamlit.
-
-components.html(
+def process_recovery_link():
     """
-    <script>
-    (() => {
-        try {
-            const parentWindow = window.parent;
-            const currentUrl = new URL(parentWindow.location.href);
-            const hash = currentUrl.hash;
+    Membaca token recovery dari URL fragment menggunakan
+    Streamlit Components v2, lalu meneruskannya ke Python.
+    """
 
-            if (
-                hash.includes("access_token=") &&
-                hash.includes("type=recovery")
-            ) {
-                const params = new URLSearchParams(
-                    hash.substring(1)
-                );
+    if "reset_access_token" in st.session_state:
+        return
 
-                const accessToken = params.get("access_token");
-                const refreshToken = params.get("refresh_token");
-                const recoveryType = params.get("type");
+    # Dukungan link PKCE (?code=...)
+    recovery_code = st.query_params.get("code")
+    recovery_token_hash = st.query_params.get("token_hash")
+    query_type = st.query_params.get("type")
+
+    if recovery_code or (
+        recovery_token_hash and query_type == "recovery"
+    ):
+        try:
+            recovery = exchange_recovery_link(
+                code=recovery_code,
+                token_hash=recovery_token_hash,
+            )
+
+            st.session_state["reset_access_token"] = (
+                recovery["access_token"]
+            )
+            st.session_state["reset_refresh_token"] = (
+                recovery["refresh_token"]
+            )
+
+            st.query_params.clear()
+            st.rerun()
+
+        except Exception:
+            st.error(
+                "Link reset tidak valid atau sudah kedaluwarsa. "
+                "Silakan minta link reset yang baru."
+            )
+            st.stop()
+
+    # Dukungan token dari URL fragment (#access_token=...)
+    try:
+        component_v2 = st.components.v2
+    except AttributeError:
+        component_v2 = None
+
+    if component_v2 is None:
+        # Aplikasi biasa tetap dapat digunakan, tetapi pemrosesan
+        # fragment membutuhkan versi Streamlit yang mendukung v2.
+        return
+
+    recovery_component = component_v2.component(
+        name="jobify_recovery_link",
+        html="<div></div>",
+        js="""
+        export default function(component) {
+            const { setStateValue } = component;
+
+            try {
+                const hash = window.location.hash;
 
                 if (
-                    accessToken &&
-                    refreshToken &&
-                    recoveryType === "recovery"
+                    hash.includes("access_token=") &&
+                    hash.includes("type=recovery")
                 ) {
-                    currentUrl.hash = "";
-                    currentUrl.searchParams.set(
-                        "recovery_access_token",
-                        accessToken
-                    );
-                    currentUrl.searchParams.set(
-                        "recovery_refresh_token",
-                        refreshToken
-                    );
-                    currentUrl.searchParams.set(
-                        "recovery_type",
-                        "recovery"
+                    const params = new URLSearchParams(
+                        hash.substring(1)
                     );
 
-                    parentWindow.location.replace(
-                        currentUrl.pathname +
-                        currentUrl.search +
-                        currentUrl.hash
-                    );
+                    const accessToken =
+                        params.get("access_token");
+                    const refreshToken =
+                        params.get("refresh_token");
+                    const recoveryType = params.get("type");
+
+                    if (
+                        accessToken &&
+                        refreshToken &&
+                        recoveryType === "recovery"
+                    ) {
+                        // Hapus token dari URL browser.
+                        window.history.replaceState(
+                            null,
+                            "",
+                            window.location.pathname +
+                            window.location.search
+                        );
+
+                        // Kirim token ke Python melalui state.
+                        setStateValue(
+                            "recovery",
+                            JSON.stringify({
+                                access_token: accessToken,
+                                refresh_token: refreshToken,
+                                type: recoveryType
+                            })
+                        );
+                    }
                 }
+            } catch (error) {
+                console.error(
+                    "Gagal membaca link recovery Jobify:",
+                    error
+                );
             }
-        } catch (error) {
-            console.error(
-                "Gagal memproses link recovery Jobify:",
-                error
-            );
         }
-    })();
-    </script>
-    """,
-    height=0,
-)
-
-# Baca token recovery yang diteruskan dari URL fragment
-recovery_access_token = st.query_params.get(
-    "recovery_access_token"
-)
-recovery_refresh_token = st.query_params.get(
-    "recovery_refresh_token"
-)
-recovery_type = st.query_params.get("recovery_type")
-
-# Proses token fragment terlebih dahulu
-if (
-    recovery_access_token
-    and recovery_refresh_token
-    and recovery_type == "recovery"
-    and "reset_access_token" not in st.session_state
-):
-    st.session_state["reset_access_token"] = (
-        recovery_access_token
-    )
-    st.session_state["reset_refresh_token"] = (
-        recovery_refresh_token
+        """,
     )
 
-    # Hapus token dari URL setelah disimpan ke session state
-    st.query_params.clear()
-    st.rerun()
-
-# Tetap mendukung link dengan format PKCE (?code=...)
-recovery_code = st.query_params.get("code")
-recovery_token_hash = st.query_params.get("token_hash")
-
-if (
-    recovery_code
-    or (
-        recovery_token_hash
-        and st.query_params.get("type") == "recovery"
+    result = recovery_component(
+        default={"recovery": ""},
+        key="jobify_recovery_component",
+        on_recovery_change=lambda: None,
     )
-) and "reset_access_token" not in st.session_state:
-    try:
-        recovery = exchange_recovery_link(
-            code=recovery_code,
-            token_hash=recovery_token_hash,
-        )
 
-        st.session_state["reset_access_token"] = (
-            recovery["access_token"]
-        )
-        st.session_state["reset_refresh_token"] = (
-            recovery["refresh_token"]
-        )
+    recovery_value = getattr(result, "recovery", None)
 
-        st.query_params.clear()
-        st.rerun()
+    if recovery_value and isinstance(recovery_value, str):
+        try:
+            recovery_data = json.loads(recovery_value)
 
-    except Exception as e:
-        st.error(
-            "Link reset tidak valid atau sudah kedaluwarsa. "
-            "Silakan minta link reset yang baru."
-        )
-        st.stop()
+            if (
+                recovery_data.get("type") == "recovery"
+                and recovery_data.get("access_token")
+                and recovery_data.get("refresh_token")
+            ):
+                st.session_state["reset_access_token"] = (
+                    recovery_data["access_token"]
+                )
+                st.session_state["reset_refresh_token"] = (
+                    recovery_data["refresh_token"]
+                )
+                st.rerun()
 
+        except (json.JSONDecodeError, TypeError, ValueError):
+            pass
+
+
+process_recovery_link()
 
 
 # ==================================================
@@ -219,12 +225,16 @@ if "reset_access_token" in st.session_state:
 
                 st.session_state.pop("reset_access_token", None)
                 st.session_state.pop("reset_refresh_token", None)
-
                 st.session_state["password_reset_success"] = True
+
                 st.rerun()
 
-            except Exception as e:
-                st.error(f"Password gagal diperbarui: {e}")
+            except Exception:
+                st.error(
+                    "Password gagal diperbarui. "
+                    "Link mungkin sudah kedaluwarsa. "
+                    "Silakan minta link reset yang baru."
+                )
 
     st.stop()
 
@@ -246,7 +256,6 @@ if st.session_state.get("password_reset_success"):
         st.rerun()
 
     st.stop()
-
 
 
 # ==================================================
@@ -278,15 +287,12 @@ if "user" not in st.session_state:
                 key="login_password",
             )
 
-            # Tombol login diproses di bawah form.
             submitted = st.form_submit_button(
                 "Login",
                 type="primary",
                 use_container_width=True,
             )
 
-        # Link bantuan diletakkan tepat di atas tombol Login
-        # secara visual melalui area sebelum form login.
         with st.expander("Lupa Password?"):
             st.write(
                 "Masukkan email akun Jobify untuk menerima "
@@ -311,6 +317,7 @@ if "user" not in st.session_state:
                 else:
                     try:
                         send_password_reset(reset_email.strip())
+
                         st.success(
                             "Jika email terdaftar, link reset "
                             "akan dikirim. Periksa inbox dan spam."
@@ -345,12 +352,12 @@ if "user" not in st.session_state:
                 key="register_full_name",
             )
 
-            email = st.text_input(
+            register_email = st.text_input(
                 "Email",
                 key="register_email",
             )
 
-            password = st.text_input(
+            register_password = st.text_input(
                 "Password (minimal 6 karakter)",
                 type="password",
                 key="register_password",
@@ -362,38 +369,47 @@ if "user" not in st.session_state:
                 key="register_confirm_password",
             )
 
-            submitted = st.form_submit_button(
+            register_submitted = st.form_submit_button(
                 "Buat Akun",
                 type="primary",
                 use_container_width=True,
             )
 
-        if submitted:
-            if not full_name.strip() or not email.strip():
+        if register_submitted:
+            if not full_name.strip() or not register_email.strip():
                 st.error("Nama dan email wajib diisi.")
-            elif len(password) < 6:
+
+            elif len(register_password) < 6:
                 st.error("Password minimal 6 karakter.")
-            elif password != confirm_password:
+
+            elif register_password != confirm_password:
                 st.error("Konfirmasi password tidak sama.")
+
             else:
                 try:
                     has_session = register(
                         full_name.strip(),
-                        email.strip(),
-                        password,
+                        register_email.strip(),
+                        register_password,
                     )
 
                     if has_session:
-                        login(email.strip(), password)
+                        login(
+                            register_email.strip(),
+                            register_password,
+                        )
+
                         st.success(
                             "Registrasi berhasil! Kamu sudah login."
                         )
                         st.rerun()
+
                     else:
                         st.error(
                             "Sesi login belum tersedia. Periksa "
                             "pengaturan Confirm email di Supabase."
                         )
+
                 except Exception:
                     st.error(
                         "Registrasi gagal. Email mungkin sudah "
@@ -482,12 +498,15 @@ else:
 
     if current_page == "dashboard":
         from pages.user_dashboard import run_user_dashboard
+
         run_user_dashboard()
 
     elif current_page == "screening":
         from pages.cv_screening import run_cv_screening
+
         run_cv_screening()
 
     elif current_page == "career_match":
         from pages.career_match import run_career_match
+
         run_career_match()
