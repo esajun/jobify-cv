@@ -559,10 +559,20 @@ else:
 
     current_page = st.session_state["user_page"]
 
+
     if current_page == "dashboard":
         from pages.user_dashboard import run_user_dashboard
 
-        run_user_dashboard()
+        try:
+            run_user_dashboard()
+        except RuntimeError as e:
+            st.warning(str(e))
+
+            if st.button("Kembali ke Login", type="primary"):
+                st.session_state.pop("user", None)
+                st.session_state.pop("user_page", None)
+                st.rerun()
+
 
     elif current_page == "screening":
         from pages.cv_screening import run_cv_screening
