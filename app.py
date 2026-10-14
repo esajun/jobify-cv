@@ -43,11 +43,9 @@ st.markdown(
 # ==================================================
 
 def process_recovery_link():
-    """
-    Membaca token recovery dari URL fragment menggunakan
-    Streamlit Components v2, lalu meneruskannya ke Python.
-    """
-
+    # Jangan proses ulang link reset setelah reset selesai
+    if st.session_state.get("password_reset_completed"):
+        return
     if "reset_access_token" in st.session_state:
         return
 
@@ -199,16 +197,16 @@ if "reset_access_token" in st.session_state:
         st.success(st.session_state["password_reset_message"])
 
         if st.button(
-            "➡️ Login Sekarang",
-            type="primary",
-            use_container_width=True,
-            key="reset_login_button",
+        "➡️ Login Sekarang",
+        type="primary",
+        use_container_width=True,
+        key="reset_login_button",
         ):
-            # Hapus semua state reset password
+            # Hapus state formulir reset, tetapi pertahankan
+            # password_reset_completed agar link lama tidak diproses ulang.
             for key in (
                 "password_reset_message",
                 "password_reset_error",
-                "password_reset_success",
                 "reset_access_token",
                 "reset_refresh_token",
             ):
@@ -225,7 +223,7 @@ if "reset_access_token" in st.session_state:
             ):
                 st.query_params.pop(key, None)
 
-            # Pastikan kembali ke halaman login
+            # Kembali ke halaman login
             st.session_state.pop("user", None)
             st.session_state.pop("user_page", None)
 
@@ -279,6 +277,7 @@ if "reset_access_token" in st.session_state:
                 )
 
                 st.session_state.pop("password_reset_error", None)
+                st.session_state["password_reset_completed"] = True
                 st.session_state["password_reset_message"] = (
                     "Password berhasil diperbarui! "
                     "Silakan login menggunakan password baru."
