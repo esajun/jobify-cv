@@ -44,46 +44,113 @@ st.markdown(
 
 
 
+
 # ==================================================
 # PEMROSESAN LINK RESET PASSWORD DARI SUPABASE
 # ==================================================
 
-import json
 import streamlit.components.v1 as components
 
-# Membaca token dari URL fragment (#...)
-fragment_data = components.html(
+# Supabase mengirim token recovery melalui URL fragment (#...)
+# Ubah fragment menjadi parameter sementara agar dapat dibaca
+# oleh Python Streamlit.
+
+components.html(
     """
     <script>
-    const hash = window.parent.location.hash;
+    (() => {
+        try {
+            const parentWindow = window.parent;
+            const currentUrl = new URL(parentWindow.location.href);
+            const hash = currentUrl.hash;
 
-    if (hash && hash.includes("type=recovery")) {
-        const params = new URLSearchParams(hash.substring(1));
+            if (
+                hash.includes("access_token=") &&
+                hash.includes("type=recovery")
+            ) {
+                const params = new URLSearchParams(
+                    hash.substring(1)
+                );
 
-        const data = {
-            access_token: params.get("access_token"),
-            refresh_token: params.get("refresh_token"),
-            type: params.get("type")
-        };
+                const accessToken = params.get("access_token");
+                const refreshToken = params.get("refresh_token");
+                const recoveryType = params.get("type");
 
-        window.parent.postMessage({
-            isJobifyRecovery: true,
-            payload: data
-        }, window.location.origin);
-    }
+                if (
+                    accessToken &&
+                    refreshToken &&
+                    recoveryType === "recovery"
+                ) {
+                    currentUrl.hash = "";
+                    currentUrl.searchParams.set(
+                        "recovery_access_token",
+                        accessToken
+                    );
+                    currentUrl.searchParams.set(
+                        "recovery_refresh_token",
+                        refreshToken
+                    );
+                    currentUrl.searchParams.set(
+                        "recovery_type",
+                        "recovery"
+                    );
+
+                    parentWindow.location.replace(
+                        currentUrl.pathname +
+                        currentUrl.search +
+                        currentUrl.hash
+                    );
+                }
+            }
+        } catch (error) {
+            console.error(
+                "Gagal memproses link recovery Jobify:",
+                error
+            );
+        }
+    })();
     </script>
     """,
     height=0,
 )
 
-# Parameter code/token_hash tetap diperiksa seperti sebelumnya
+# Baca token recovery yang diteruskan dari URL fragment
+recovery_access_token = st.query_params.get(
+    "recovery_access_token"
+)
+recovery_refresh_token = st.query_params.get(
+    "recovery_refresh_token"
+)
+recovery_type = st.query_params.get("recovery_type")
+
+# Proses token fragment terlebih dahulu
+if (
+    recovery_access_token
+    and recovery_refresh_token
+    and recovery_type == "recovery"
+    and "reset_access_token" not in st.session_state
+):
+    st.session_state["reset_access_token"] = (
+        recovery_access_token
+    )
+    st.session_state["reset_refresh_token"] = (
+        recovery_refresh_token
+    )
+
+    # Hapus token dari URL setelah disimpan ke session state
+    st.query_params.clear()
+    st.rerun()
+
+# Tetap mendukung link dengan format PKCE (?code=...)
 recovery_code = st.query_params.get("code")
 recovery_token_hash = st.query_params.get("token_hash")
-recovery_type = st.query_params.get("type")
 
 if (
     recovery_code
-    or (recovery_token_hash and recovery_type == "recovery")
+    or (
+        recovery_token_hash
+        and st.query_params.get("type") == "recovery"
+    )
 ) and "reset_access_token" not in st.session_state:
     try:
         recovery = exchange_recovery_link(
@@ -91,69 +158,22 @@ if (
             token_hash=recovery_token_hash,
         )
 
-        st.session_state["reset_access_token"] = recovery["access_token"]
-        st.session_state["reset_refresh_token"] = recovery["refresh_token"]
+        st.session_state["reset_access_token"] = (
+            recovery["access_token"]
+        )
+        st.session_state["reset_refresh_token"] = (
+            recovery["refresh_token"]
+        )
 
         st.query_params.clear()
         st.rerun()
 
-    except Exception:
+    except Exception as e:
         st.error(
             "Link reset tidak valid atau sudah kedaluwarsa. "
-            "Silakan minta link reset password yang baru."
+            "Silakan minta link reset yang baru."
         )
         st.stop()
-
-
-# ==================================================
-# HALAMAN PASSWORD BARU
-# ==================================================
-
-if "reset_access_token" in st.session_state:
-    st.title("🔐 Buat Password Baru")
-    st.write("Masukkan password baru untuk akun Jobify kamu.")
-
-    with st.form("new_password_form"):
-        new_password = st.text_input(
-            "Password Baru",
-            type="password",
-        )
-        confirm_password = st.text_input(
-            "Konfirmasi Password Baru",
-            type="password",
-        )
-
-        submitted = st.form_submit_button(
-            "Simpan Password",
-            type="primary",
-            use_container_width=True,
-        )
-
-    if submitted:
-        if len(new_password) < 6:
-            st.error("Password minimal 6 karakter.")
-        elif new_password != confirm_password:
-            st.error("Konfirmasi password tidak sama.")
-        else:
-            try:
-                update_password(
-                    st.session_state["reset_access_token"],
-                    st.session_state["reset_refresh_token"],
-                    new_password,
-                )
-
-                st.session_state.pop("reset_access_token", None)
-                st.session_state.pop("reset_refresh_token", None)
-                st.session_state["password_reset_success"] = True
-                st.rerun()
-
-            except Exception:
-                st.error(
-                    "Password gagal diperbarui. "
-                    "Silakan minta link reset yang baru."
-                )
-
-    st.stop()
 
 
 # ==================================================
