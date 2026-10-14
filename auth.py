@@ -9,17 +9,17 @@ load_dotenv(Path(__file__).resolve().parent / ".env")
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_PUBLISHABLE_KEY")
+RESET_REDIRECT_URL = os.getenv("PASSWORD_RESET_REDIRECT_URL")
 
 
 def _new_client():
     if not SUPABASE_URL or not SUPABASE_KEY:
-        raise RuntimeError("Konfigurasi Supabase belum lengkap di .env.")
+        raise RuntimeError("Konfigurasi Supabase belum lengkap.")
 
     return create_client(SUPABASE_URL, SUPABASE_KEY)
 
 
 def get_client():
-    """Membuat client Supabase dengan sesi pengguna yang sedang login."""
     user = st.session_state.get("user")
 
     if not user:
@@ -44,7 +44,6 @@ def login(email, password):
     if not response.user or not response.session:
         raise RuntimeError("Login gagal.")
 
-    # Ambil profil menggunakan sesi pengguna yang sudah terautentikasi.
     profile_response = (
         client.table("profiles")
         .select("full_name, role")
@@ -88,11 +87,9 @@ def register(full_name, email, password):
         },
     })
 
-    # Supabase bisa meminta verifikasi email sebelum login.
     if not response.user or not response.session:
         return False
 
-    # Jika sesi langsung tersedia, buat profil jika trigger belum membuatnya.
     profile = (
         client.table("profiles")
         .select("id")
@@ -108,6 +105,54 @@ def register(full_name, email, password):
         }).execute()
 
     return True
+
+
+def send_password_reset(email):
+    if not RESET_REDIRECT_URL:
+        raise RuntimeError(
+            "PASSWORD_RESET_REDIRECT_URL belum dikonfigurasi."
+        )
+
+    client = _new_client()
+    client.auth.reset_password_for_email(
+        email,
+        options={"redirect_to": RESET_REDIRECT_URL},
+    )
+
+
+
+
+def exchange_recovery_link(code=None, token_hash=None):
+    client = _new_client()
+
+    if code:
+        response = client.auth.exchange_code_for_session(code)
+
+    elif token_hash:
+        response = client.auth.verify_otp({
+            "token_hash": token_hash,
+            "type": "recovery",
+        })
+
+    else:
+        raise RuntimeError("Kode pemulihan tidak ditemukan.")
+
+    if not response.session:
+        raise RuntimeError(
+            "Sesi pemulihan gagal dibuat. Minta link reset baru."
+        )
+
+    return {
+        "access_token": response.session.access_token,
+        "refresh_token": response.session.refresh_token,
+    }
+
+
+
+def update_password(access_token, refresh_token, new_password):
+    client = _new_client()
+    client.auth.set_session(access_token, refresh_token)
+    client.auth.update_user({"password": new_password})
 
 
 def logout():
