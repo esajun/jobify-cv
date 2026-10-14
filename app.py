@@ -191,7 +191,7 @@ if "reset_access_token" in st.session_state:
     st.title("🔐 Buat Password Baru")
     st.write("Masukkan password baru untuk akun Jobify kamu.")
 
-    # Notifikasi hasil penyimpanan
+    # Tampilkan notifikasi hasil penyimpanan
     if st.session_state.get("password_reset_error"):
         st.error(st.session_state["password_reset_error"])
 
@@ -204,11 +204,31 @@ if "reset_access_token" in st.session_state:
             use_container_width=True,
             key="reset_login_button",
         ):
-            st.session_state.pop("password_reset_message", None)
-            st.session_state.pop("password_reset_error", None)
-            st.session_state.pop("reset_access_token", None)
-            st.session_state.pop("reset_refresh_token", None)
-            st.session_state.pop("password_reset_success", None)
+            # Hapus semua state reset password
+            for key in (
+                "password_reset_message",
+                "password_reset_error",
+                "password_reset_success",
+                "reset_access_token",
+                "reset_refresh_token",
+            ):
+                st.session_state.pop(key, None)
+
+            # Bersihkan parameter recovery pada URL
+            for key in (
+                "code",
+                "token_hash",
+                "type",
+                "recovery_access_token",
+                "recovery_refresh_token",
+                "recovery_type",
+            ):
+                st.query_params.pop(key, None)
+
+            # Pastikan kembali ke halaman login
+            st.session_state.pop("user", None)
+            st.session_state.pop("user_page", None)
+
             st.rerun()
 
         st.stop()
@@ -234,19 +254,19 @@ if "reset_access_token" in st.session_state:
     if submitted:
         if not new_password or not confirm_password:
             st.session_state["password_reset_error"] = (
-                "⚠️ Kedua kolom password wajib diisi."
+                "Kedua kolom password wajib diisi."
             )
             st.rerun()
 
         elif len(new_password) < 6:
             st.session_state["password_reset_error"] = (
-                "❌ Password minimal 6 karakter."
+                "Password minimal 6 karakter."
             )
             st.rerun()
 
         elif new_password != confirm_password:
             st.session_state["password_reset_error"] = (
-                "❌ Konfirmasi password tidak sama."
+                "Konfirmasi password tidak sama."
             )
             st.rerun()
 
@@ -260,66 +280,21 @@ if "reset_access_token" in st.session_state:
 
                 st.session_state.pop("password_reset_error", None)
                 st.session_state["password_reset_message"] = (
-                    "✅ Password berhasil diperbarui! "
+                    "Password berhasil diperbarui! "
                     "Silakan login menggunakan password baru."
                 )
 
                 st.rerun()
 
-            except Exception as e:
+            except Exception:
                 st.session_state["password_reset_error"] = (
-                    "❌ Password gagal diperbarui. "
-                    f"Detail: {str(e)}"
+                    "Password gagal diperbarui. "
+                    "Link reset mungkin sudah kedaluwarsa. "
+                    "Silakan minta link reset yang baru."
                 )
                 st.rerun()
 
     st.stop()
-
-
-# ==================================================
-# KONFIRMASI RESET BERHASIL (JIKA TOKEN SUDAH DIHAPUS)
-# ==================================================
-
-if st.session_state.get("password_reset_message"):
-    st.title("🔐 Password Berhasil Diubah")
-
-    st.success(st.session_state["password_reset_message"])
-
-    if st.button(
-        "➡️ Login Sekarang",
-        type="primary",
-        use_container_width=True,
-        key="reset_login_button_success",
-    ):
-        st.session_state.pop("password_reset_message", None)
-        st.session_state.pop("password_reset_error", None)
-        st.rerun()
-
-    st.stop()
-
-
-# ==================================================
-# KONFIRMASI RESET BERHASIL
-# ==================================================
-
-if st.session_state.get("password_reset_success"):
-    st.title("🔐 Password Berhasil Diubah")
-
-    st.success(
-        "✅ Password berhasil disimpan! "
-        "Sekarang kamu bisa login menggunakan password baru."
-    )
-
-    if st.button(
-        "➡️ Login Sekarang",
-        type="primary",
-        use_container_width=True,
-    ):
-        st.session_state.pop("password_reset_success", None)
-        st.rerun()
-
-    st.stop()
-
 
 # ==================================================
 # LOGIN, LUPA PASSWORD, DAN REGISTER
