@@ -23,14 +23,48 @@ def get_client():
     user = st.session_state.get("user")
 
     if not user:
-        raise RuntimeError("Pengguna belum login.")
+        raise RuntimeError("Sesi login tidak ditemukan.")
 
     client = _new_client()
-    client.auth.set_session(
-        user["access_token"],
-        user["refresh_token"],
-    )
-    return client
+
+    # Coba gunakan sesi yang tersimpan.
+    try:
+        client.auth.set_session(
+            user["access_token"],
+            user["refresh_token"],
+        )
+        return client
+
+    except Exception:
+        # Jika access token sudah tidak valid,
+        # coba perbarui sesi menggunakan refresh token.
+        try:
+            response = client.auth.refresh_session(
+                user.get("refresh_token")
+            )
+
+            session = response.session
+
+            if not session:
+                raise RuntimeError("Sesi baru tidak tersedia.")
+
+            # Simpan token terbaru agar digunakan pada rerun berikutnya.
+            user["access_token"] = session.access_token
+            user["refresh_token"] = session.refresh_token
+            st.session_state["user"] = user
+
+            return client
+
+        except Exception:
+            # Jika refresh token juga tidak valid,
+            # minta pengguna login kembali.
+            st.session_state.pop("user", None)
+            st.session_state.pop("user_page", None)
+
+            raise RuntimeError(
+                "Sesi login sudah berakhir atau dicabut. "
+                "Silakan login kembali."
+            )
 
 
 def login(email, password):
