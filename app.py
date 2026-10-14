@@ -43,10 +43,40 @@ st.markdown(
 )
 
 
+
 # ==================================================
 # PEMROSESAN LINK RESET PASSWORD DARI SUPABASE
 # ==================================================
 
+import json
+import streamlit.components.v1 as components
+
+# Membaca token dari URL fragment (#...)
+fragment_data = components.html(
+    """
+    <script>
+    const hash = window.parent.location.hash;
+
+    if (hash && hash.includes("type=recovery")) {
+        const params = new URLSearchParams(hash.substring(1));
+
+        const data = {
+            access_token: params.get("access_token"),
+            refresh_token: params.get("refresh_token"),
+            type: params.get("type")
+        };
+
+        window.parent.postMessage({
+            isJobifyRecovery: true,
+            payload: data
+        }, window.location.origin);
+    }
+    </script>
+    """,
+    height=0,
+)
+
+# Parameter code/token_hash tetap diperiksa seperti sebelumnya
 recovery_code = st.query_params.get("code")
 recovery_token_hash = st.query_params.get("token_hash")
 recovery_type = st.query_params.get("type")
@@ -61,12 +91,8 @@ if (
             token_hash=recovery_token_hash,
         )
 
-        st.session_state["reset_access_token"] = recovery[
-            "access_token"
-        ]
-        st.session_state["reset_refresh_token"] = recovery[
-            "refresh_token"
-        ]
+        st.session_state["reset_access_token"] = recovery["access_token"]
+        st.session_state["reset_refresh_token"] = recovery["refresh_token"]
 
         st.query_params.clear()
         st.rerun()
