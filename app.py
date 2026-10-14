@@ -176,12 +176,66 @@ if (
         st.stop()
 
 
+
+# ==================================================
+# HALAMAN PASSWORD BARU
+# ==================================================
+
+if "reset_access_token" in st.session_state:
+    st.title("🔐 Buat Password Baru")
+    st.write("Masukkan password baru untuk akun Jobify kamu.")
+
+    with st.form("new_password_form"):
+        new_password = st.text_input(
+            "Password Baru",
+            type="password",
+        )
+
+        confirm_password = st.text_input(
+            "Konfirmasi Password Baru",
+            type="password",
+        )
+
+        submitted = st.form_submit_button(
+            "Simpan Password",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if submitted:
+        if len(new_password) < 6:
+            st.error("Password minimal 6 karakter.")
+
+        elif new_password != confirm_password:
+            st.error("Konfirmasi password tidak sama.")
+
+        else:
+            try:
+                update_password(
+                    st.session_state["reset_access_token"],
+                    st.session_state["reset_refresh_token"],
+                    new_password,
+                )
+
+                st.session_state.pop("reset_access_token", None)
+                st.session_state.pop("reset_refresh_token", None)
+
+                st.session_state["password_reset_success"] = True
+                st.rerun()
+
+            except Exception as e:
+                st.error(f"Password gagal diperbarui: {e}")
+
+    st.stop()
+
+
 # ==================================================
 # KONFIRMASI RESET BERHASIL
 # ==================================================
 
 if st.session_state.get("password_reset_success"):
     st.title("🔐 Password Berhasil Diubah")
+
     st.success(
         "Password kamu sudah diperbarui. "
         "Silakan login menggunakan password baru."
@@ -192,6 +246,7 @@ if st.session_state.get("password_reset_success"):
         st.rerun()
 
     st.stop()
+
 
 
 # ==================================================
