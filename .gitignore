@@ -1,0 +1,23 @@
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+
+# Secrets
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+
+# Cache
+.streamlit/cache/
+
+# Editor
+.vscode/
+
+# Temporary files
+*.tmp
+*.log
