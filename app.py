@@ -195,6 +195,7 @@ if "reset_access_token" in st.session_state:
         new_password = st.text_input(
             "Password Baru",
             type="password",
+            help="Password minimal 6 karakter.",
         )
 
         confirm_password = st.text_input(
@@ -209,11 +210,14 @@ if "reset_access_token" in st.session_state:
         )
 
     if submitted:
-        if len(new_password) < 6:
-            st.error("Password minimal 6 karakter.")
+        if not new_password or not confirm_password:
+            st.error("⚠️ Kedua kolom password wajib diisi.")
+
+        elif len(new_password) < 6:
+            st.error("❌ Password minimal 6 karakter.")
 
         elif new_password != confirm_password:
-            st.error("Konfirmasi password tidak sama.")
+            st.error("❌ Konfirmasi password tidak sama.")
 
         else:
             try:
@@ -231,8 +235,8 @@ if "reset_access_token" in st.session_state:
 
             except Exception:
                 st.error(
-                    "Password gagal diperbarui. "
-                    "Link mungkin sudah kedaluwarsa. "
+                    "❌ Password gagal diperbarui. "
+                    "Link reset mungkin sudah kedaluwarsa. "
                     "Silakan minta link reset yang baru."
                 )
 
@@ -247,11 +251,15 @@ if st.session_state.get("password_reset_success"):
     st.title("🔐 Password Berhasil Diubah")
 
     st.success(
-        "Password kamu sudah diperbarui. "
-        "Silakan login menggunakan password baru."
+        "✅ Password berhasil disimpan! "
+        "Sekarang kamu bisa login menggunakan password baru."
     )
 
-    if st.button("Kembali ke Login", type="primary"):
+    if st.button(
+        "➡️ Login Sekarang",
+        type="primary",
+        use_container_width=True,
+    ):
         st.session_state.pop("password_reset_success", None)
         st.rerun()
 
