@@ -15,6 +15,16 @@ if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
 from auth import get_client
+from ui import (
+    chips,
+    details,
+    esc,
+    html_block,
+    page_header,
+    score_ring,
+    section_title,
+    to_list,
+)
 from resume_parser import extract_text_from_pdf
 from skill_extractor import extract_key_phrases
 import ml_model
@@ -65,25 +75,18 @@ def format_datetime(value):
         return str(value)
 
 
-def display_skills(skills, empty_message):
-    if isinstance(skills, list):
-        skills = [str(skill) for skill in skills if skill]
+def skill_chips(skills, empty_message, tone):
+    """Daftar skill sebagai chip; jika kosong tampilkan pesan."""
+    items = to_list(skills)[:15]
 
-    elif isinstance(skills, str):
-        skills = [
-            skill.strip()
-            for skill in skills.split(",")
-            if skill.strip()
-        ]
+    if not items:
+        return f"<p class='jf-muted-note'>{esc(empty_message)}</p>"
 
-    else:
-        skills = []
-
-    return ", ".join(skills[:15]) if skills else empty_message
+    return chips(items, tone)
 
 
-def display_job_detail(row):
-    """Menampilkan detail satu lowongan."""
+def display_job_detail(row, rank=None):
+    """Menampilkan detail satu lowongan beserta skor kecocokannya."""
     title = row.get("job_title") or "Lowongan"
     company = row.get("company") or "Perusahaan"
 
@@ -92,58 +95,97 @@ def display_job_detail(row):
     except (ValueError, TypeError):
         score = 0.0
 
-    st.markdown(f"**{title} — {company}**")
-    st.progress(max(0.0, min(score, 100.0)) / 100.0)
-    st.caption(f"Skor kecocokan: {score:.2f}%")
+    rank_html = (
+        f"<div class='jf-rank jf-rank-{rank}'>{rank}</div>"
+        if rank else ""
+    )
+
+    meta = []
 
     role_family = row.get("role_family")
     if role_family:
-        st.write(f"**Kategori peran:** {role_family}")
+        meta.append((str(role_family), "purple"))
 
-    for column, label in [
-        ("location", "Lokasi"),
-        ("salary", "Gaji"),
-        ("job_type", "Tipe pekerjaan"),
-        ("education", "Pendidikan"),
-        ("experience", "Pengalaman"),
+    for column, icon, tone in [
+        ("location", "📍", "teal"),
+        ("job_type", "💼", "coral"),
+        ("education", "🎓", ""),
+        ("experience", "🧑‍💻", ""),
     ]:
         value = row.get(column)
 
         if value is not None and str(value).strip():
-            st.write(f"**{label}:** {value}")
+            meta.append((f"{icon} {value}", tone))
 
-    description = row.get("description")
-    if description:
-        st.markdown("**Deskripsi pekerjaan**")
-        st.write(description)
+    salary = row.get("salary")
+    salary_html = (
+        f"<div class='jf-job-salary'>{esc(salary)}</div>"
+        if salary is not None and str(salary).strip() else ""
+    )
 
-    requirements = row.get("requirements")
-    if requirements:
-        st.markdown("**Kualifikasi / Requirements**")
-        st.write(requirements)
+    best_html = (
+        "<span class='jf-chip jf-chip-teal'>Paling cocok</span>"
+        if rank == 1 else ""
+    )
 
-    job_link = row.get("job_links")
-    if job_link and str(job_link).strip():
-        st.markdown(f"[Lihat lowongan]({job_link})")
+    html_block(
+        f"""
+        <div class="jf-match-head">
+            {rank_html}
+            <div class="grow">
+                <div class="jf-job-title">{esc(title)}</div>
+                <div class="jf-job-company">{esc(company)} {best_html}</div>
+            </div>
+            {score_ring(score)}
+        </div>
+        {chips(meta)}
+        {salary_html}
+        """
+    )
 
     col_a, col_b = st.columns(2)
 
     with col_a:
-        st.markdown("**✅ Skill yang Cocok**")
-        st.write(
-            display_skills(
+        html_block(
+            "<div class='jf-panel'><h4>✅ Skill yang Cocok</h4>"
+            + skill_chips(
                 row.get("matched_skills"),
                 "Belum ada skill yang cocok.",
+                "teal",
             )
+            + "</div>"
         )
 
     with col_b:
-        st.markdown("**⚠️ Skill yang Belum Terlihat**")
-        st.write(
-            display_skills(
+        html_block(
+            "<div class='jf-panel'><h4>⚠️ Skill yang Belum Terlihat</h4>"
+            + skill_chips(
                 row.get("missing_skills"),
                 "Tidak ada gap yang terdeteksi.",
+                "coral",
             )
+            + "</div>"
+        )
+
+    extra = ""
+
+    description = row.get("description")
+    if description:
+        extra += details("Deskripsi pekerjaan", description)
+
+    requirements = row.get("requirements")
+    if requirements:
+        extra += details("Kualifikasi / Requirements", requirements)
+
+    if extra:
+        html_block(extra)
+
+    job_link = row.get("job_links")
+    if job_link and str(job_link).strip().startswith(("http://", "https://")):
+        st.link_button(
+            "Lihat Lowongan",
+            str(job_link).strip(),
+            type="primary",
         )
 
 
@@ -167,51 +209,71 @@ def display_history_item(item, index):
         except (ValueError, TypeError, AttributeError):
             pass
 
-    with st.container(border=True):
-        col_info, col_score = st.columns([3, 1])
-
-        with col_info:
-            st.markdown(f"**📄 {filename}**")
-            st.caption(f"🕒 {created_at}")
-            st.caption(f"{total} rekomendasi lowongan")
-
-        with col_score:
-            st.metric("Skor Tertinggi", f"{first_score:.2f}%")
+    with st.container(border=True, key=f"card_history_{index}"):
+        html_block(
+            f"""
+            <div class="jf-match-head">
+                <div class="jf-job-logo" style="background:var(--jf-lav);color:var(--jf-purple)">📄</div>
+                <div class="grow">
+                    <div class="jf-job-title" style="font-size:1.05rem">{esc(filename)}</div>
+                    <div class="jf-job-company">🕒 {esc(created_at)}</div>
+                    {chips([(f"{total} rekomendasi lowongan", "teal")])}
+                </div>
+                <div style="text-align:center">
+                    {score_ring(first_score)}
+                    <div class="jf-muted-note" style="margin-top:4px">Skor tertinggi</div>
+                </div>
+            </div>
+            """
+        )
 
         with st.expander("Lihat rekomendasi sebelumnya"):
             if recommendations:
                 for i, job in enumerate(recommendations, start=1):
                     with st.container(border=True):
-                        display_job_detail(job)
+                        display_job_detail(job, rank=i)
             else:
                 st.info("Detail rekomendasi tidak tersedia.")
 
 
 def run_career_match():
-    st.title("🎯 Career Match")
-    st.write(
-        "Upload CV untuk mendapatkan rekomendasi lowongan "
-        "yang paling sesuai dengan keterampilanmu."
+    page_header(
+        "Career",
+        "Match",
+        "Upload CV untuk mendapatkan rekomendasi lowongan yang "
+        "paling sesuai dengan keterampilanmu.",
+        badge="Rekomendasi AI",
     )
 
-    uploaded_cv = st.file_uploader(
-        "Upload CV (PDF)",
-        type=["pdf"],
-        key="career_cv",
-    )
+    with st.container(border=True, key="card_upload"):
+        col_upload, col_options = st.columns([3, 2], gap="large")
 
-    top_n = st.slider(
-        "Jumlah rekomendasi",
-        min_value=3,
-        max_value=15,
-        value=5,
-        key="top_n",
-    )
+        with col_upload:
+            uploaded_cv = st.file_uploader(
+                "Upload CV (PDF)",
+                type=["pdf"],
+                key="career_cv",
+            )
+
+        with col_options:
+            top_n = st.slider(
+                "Jumlah rekomendasi",
+                min_value=3,
+                max_value=15,
+                value=5,
+                key="top_n",
+            )
+
+            search_clicked = st.button(
+                "Cari Lowongan Cocok",
+                type="primary",
+                use_container_width=True,
+            )
 
     # =========================================================
     # CARI LOWONGAN DAN SIMPAN OTOMATIS
     # =========================================================
-    if st.button("🎯 Cari Lowongan Cocok", type="primary"):
+    if search_clicked:
         if uploaded_cv is None:
             st.warning("Mohon upload CV terlebih dahulu.")
 
@@ -331,34 +393,23 @@ def run_career_match():
     result_data = st.session_state.get("career_match_result")
 
     if result_data:
-        st.divider()
-
         recommendations = result_data.get("recommendations", [])
         result_top_n = result_data.get("top_n", top_n)
 
-        st.subheader(
-            f"🏆 Top {result_top_n} Lowongan Paling Cocok"
-        )
+        section_title(f"Top {result_top_n} Lowongan Paling Cocok")
 
         if recommendations:
             for index, row in enumerate(recommendations, start=1):
-                title = row.get("job_title") or "Lowongan"
-                company = row.get("company") or "Perusahaan"
-
-                try:
-                    score = float(row.get("match_score") or 0)
-                except (ValueError, TypeError):
-                    score = 0.0
-
-                with st.expander(
-                    f"{index}. {title} — {company} | {score:.2f}%",
-                    expanded=(index == 1),
+                with st.container(
+                    border=True,
+                    key=f"card_match_{index}",
                 ):
-                    display_job_detail(row)
+                    display_job_detail(row, rank=index)
 
-            st.info(
-                "Rekomendasi dibuat otomatis berdasarkan data lowongan "
-                "yang tersedia dan menjadi referensi awal."
+            html_block(
+                "<div class='jf-info'>Rekomendasi dibuat otomatis "
+                "berdasarkan data lowongan yang tersedia dan menjadi "
+                "referensi awal.</div>"
             )
         else:
             st.info("Belum ditemukan rekomendasi lowongan.")
@@ -366,8 +417,7 @@ def run_career_match():
     # =========================================================
     # RIWAYAT CAREER MATCH
     # =========================================================
-    st.divider()
-    st.subheader("🗂️ Riwayat Career Match")
+    section_title("Riwayat Career Match")
     st.caption(
         "Lihat kembali hasil rekomendasi dari analisis CV sebelumnya."
     )

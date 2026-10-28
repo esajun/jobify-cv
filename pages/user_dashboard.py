@@ -3,6 +3,16 @@ import streamlit as st
 import pandas as pd
 
 from auth import get_client
+from ui import (
+    chips,
+    company_logo,
+    esc,
+    html_block,
+    page_header,
+    section_title,
+    stat_cards,
+    to_list,
+)
 
 
 PAGE_SIZE = 20
@@ -12,10 +22,12 @@ def run_user_dashboard():
     user = st.session_state.get("user", {})
     client = get_client()
 
-    st.title("Cari Lowongan Kerja")
-    st.write(f"Halo, {user.get('full_name', 'User')} 👋")
-    st.caption(
-        "Temukan pekerjaan yang sesuai dengan minat dan kemampuanmu."
+    page_header(
+        "Cari",
+        "Lowongan Kerja",
+        f"Halo, {user.get('full_name', 'User')}! Temukan pekerjaan yang "
+        "sesuai dengan minat dan kemampuanmu.",
+        badge="Dashboard",
     )
 
     # ==========================================
@@ -340,139 +352,119 @@ def run_user_dashboard():
     )
 
     # ==========================================
-    # RINGKASAN
+    # RINGKASAN (kartu statistik ditampilkan setelah filter)
     # ==========================================
-    if show_all_jobs:
-        st.metric(
-            "Lowongan Dimuat",
-            f"{len(jobs):,}",
-        )
-        st.caption(
-            "Pencarian dan filter berlaku untuk seluruh "
-            "lowongan aktif yang dimuat."
-        )
-    else:
-        st.metric(
-            "Lowongan Terbaru",
-            f"{len(jobs):,}",
-        )
-        st.caption(
-            "Menampilkan 20 lowongan terbaru. "
-            "Aktifkan pilihan pencarian seluruh lowongan "
-            "untuk melihat lowongan lainnya."
+    section_title("Temukan Pekerjaanmu")
+
+    with st.container(border=True, key="card_filters"):
+        # ==========================================
+        # PENCARIAN
+        # ==========================================
+        keyword = st.text_input(
+            "Cari Posisi atau Perusahaan",
+            placeholder=(
+                "Contoh: Data Analyst, Programmer, "
+                "atau nama perusahaan"
+            ),
+            key="job_keyword",
         )
 
-    st.divider()
-    st.subheader("Temukan Pekerjaanmu")
+        # ==========================================
+        # FILTER UTAMA
+        # ==========================================
+        col1, col2, col3 = st.columns(3)
 
-    # ==========================================
-    # PENCARIAN
-    # ==========================================
-    keyword = st.text_input(
-        "Cari Posisi atau Perusahaan",
-        placeholder=(
-            "Contoh: Data Analyst, Programmer, "
-            "atau nama perusahaan"
-        ),
-        key="job_keyword",
-    )
+        with col1:
+            locations = sorted(
+                x
+                for x in jobs["location_display"].unique()
+                if x and x != "Lokasi Tidak Dicantumkan"
+            )
 
-    # ==========================================
-    # FILTER UTAMA
-    # ==========================================
-    col1, col2, col3 = st.columns(3)
+            selected_location = st.selectbox(
+                "Lokasi",
+                ["Semua Lokasi"] + locations,
+            )
 
-    with col1:
-        locations = sorted(
-            x
-            for x in jobs["location_display"].unique()
-            if x and x != "Lokasi Tidak Dicantumkan"
-        )
+        with col2:
+            job_types = [
+                "Penuh Waktu",
+                "Paruh Waktu",
+                "Kontrak",
+                "Magang",
+                "Freelance",
+                "Lainnya",
+            ]
 
-        selected_location = st.selectbox(
-            "Lokasi",
-            ["Semua Lokasi"] + locations,
-        )
+            selected_type = st.selectbox(
+                "Jenis Pekerjaan",
+                ["Semua Jenis"] + job_types,
+            )
 
-    with col2:
-        job_types = [
-            "Penuh Waktu",
-            "Paruh Waktu",
-            "Kontrak",
-            "Magang",
-            "Freelance",
-            "Lainnya",
-        ]
+        with col3:
+            work_modes = [
+                "Di Lokasi",
+                "Hybrid",
+                "Remote",
+                "Tidak Dicantumkan",
+            ]
 
-        selected_type = st.selectbox(
-            "Jenis Pekerjaan",
-            ["Semua Jenis"] + job_types,
-        )
+            selected_mode = st.selectbox(
+                "Sistem Kerja",
+                ["Semua Sistem Kerja"] + work_modes,
+            )
 
-    with col3:
-        work_modes = [
-            "Di Lokasi",
-            "Hybrid",
-            "Remote",
-            "Tidak Dicantumkan",
-        ]
+        # ==========================================
+        # FILTER TAMBAHAN
+        # ==========================================
+        col4, col5 = st.columns(2)
 
-        selected_mode = st.selectbox(
-            "Sistem Kerja",
-            ["Semua Sistem Kerja"] + work_modes,
-        )
+        with col4:
+            education_order = [
+                "SD",
+                "SMP",
+                "SMA / SMK",
+                "Diploma",
+                "S1 / Sarjana",
+                "S2 / Magister",
+                "S3 / Doktor",
+                "Tidak Dicantumkan",
+            ]
 
-    # ==========================================
-    # FILTER TAMBAHAN
-    # ==========================================
-    col4, col5 = st.columns(2)
+            available_educations = set(
+                jobs["education_display"].unique()
+            )
 
-    with col4:
-        education_order = [
-            "SD",
-            "SMP",
-            "SMA / SMK",
-            "Diploma",
-            "S1 / Sarjana",
-            "S2 / Magister",
-            "S3 / Doktor",
-            "Tidak Dicantumkan",
-        ]
+            educations = [
+                item
+                for item in education_order
+                if item in available_educations
+            ]
 
-        available_educations = set(
-            jobs["education_display"].unique()
-        )
+            other_educations = sorted(
+                item
+                for item in available_educations
+                if item not in education_order and item
+            )
 
-        educations = [
-            item
-            for item in education_order
-            if item in available_educations
-        ]
+            educations.extend(other_educations)
 
-        other_educations = sorted(
-            item
-            for item in available_educations
-            if item not in education_order and item
-        )
+            selected_education = st.selectbox(
+                "Pendidikan",
+                ["Semua Pendidikan"] + educations,
+            )
 
-        educations.extend(other_educations)
+        with col5:
+            experiences = sorted({
+                clean(value)
+                for value in jobs["experience"]
+                if clean(value)
+            })
 
-        selected_education = st.selectbox(
-            "Pendidikan",
-            ["Semua Pendidikan"] + educations,
-        )
-
-    with col5:
-        experiences = sorted({
-            clean(value)
-            for value in jobs["experience"]
-            if clean(value)
-        })
-
-        selected_experience = st.selectbox(
-            "Pengalaman",
-            ["Semua Pengalaman"] + experiences,
-        )
+            selected_experience = st.selectbox(
+                "Pengalaman",
+                ["Semua Pengalaman"] + experiences,
+            )
 
     # ==========================================
     # TERAPKAN FILTER
@@ -528,20 +520,45 @@ def run_user_dashboard():
     # ==========================================
     # PAGINATION
     # ==========================================
-    st.divider()
-
     total_jobs = len(filtered)
 
-    st.subheader(
-        f"Hasil Pencarian ({total_jobs:,} Lowongan)"
-    )
+    stat_cards([
+        (
+            "Lowongan Dimuat" if show_all_jobs else "Lowongan Terbaru",
+            f"{len(jobs):,}",
+            "seluruh lowongan aktif" if show_all_jobs
+            else "20 lowongan terbaru",
+            "teal",
+        ),
+        (
+            "Sesuai Filter",
+            f"{total_jobs:,}",
+            "lowongan ditemukan",
+            "coral",
+        ),
+        (
+            "Perusahaan",
+            f"{filtered['company'].replace('', pd.NA).nunique():,}",
+            "pada hasil pencarian",
+            "purple",
+        ),
+    ])
+
+    if not show_all_jobs:
+        st.caption(
+            "Menampilkan 20 lowongan terbaru. Aktifkan pilihan "
+            "pencarian seluruh lowongan untuk melihat lainnya."
+        )
 
     if filtered.empty:
-        st.warning(
-            "Lowongan tidak ditemukan. "
-            "Coba ubah kata kunci atau filter."
+        st.markdown(
+            "<div class='jf-empty'><b>Lowongan tidak ditemukan.</b><br>"
+            "Coba ubah kata kunci atau filter.</div>",
+            unsafe_allow_html=True,
         )
         return
+
+    section_title(f"Hasil Pencarian ({total_jobs:,} Lowongan)")
 
     total_pages = (total_jobs + PAGE_SIZE - 1) // PAGE_SIZE
 
@@ -592,45 +609,57 @@ def run_user_dashboard():
             or "Lokasi Tidak Dicantumkan"
         )
 
-        with st.container(border=True):
-            st.subheader(title)
-            st.write(f"**{company}**")
+        salary = clean(job["salary"])
+        skill_list = to_list(job["skills"])
 
-            col_a, col_b = st.columns(2)
+        meta = [
+            (f"📍 {location}", "teal"),
+            (f"💼 {clean(job['job_category'])}", "coral"),
+            (f"🏢 {clean(job['work_mode'])}", "purple"),
+            (
+                "🎓 " + (
+                    clean(job["education_display"])
+                    or "Pendidikan Tidak Dicantumkan"
+                ),
+                "",
+            ),
+            (
+                "🧑‍💻 " + (
+                    clean(job["experience"])
+                    or "Pengalaman Tidak Dicantumkan"
+                ),
+                "",
+            ),
+        ]
 
-            with col_a:
-                st.caption(f"📍 {location}")
-                st.caption(
-                    f"💼 {clean(job['job_category'])}"
-                    f" · {clean(job['work_mode'])}"
-                )
+        salary_html = (
+            f"<div class='jf-job-salary'>{esc(salary)}</div>"
+            if salary else ""
+        )
 
-            with col_b:
-                st.caption(
-                    "🎓 "
-                    + (
-                        clean(job["education_display"])
-                        or "Pendidikan Tidak Dicantumkan"
-                    )
-                )
+        skills_html = (
+            chips(skill_list[:6], "amber") if skill_list else ""
+        )
 
-                st.caption(
-                    "🧑‍💻 "
-                    + (
-                        clean(job["experience"])
-                        or "Pengalaman Tidak Dicantumkan"
-                    )
-                )
-
-            salary = clean(job["salary"])
-
-            if salary:
-                st.write(f"**Gaji:** {salary}")
+        with st.container(border=True, key=f"card_job_{job['id']}"):
+            html_block(
+                f"""
+                <div class="jf-job">
+                    {company_logo(company)}
+                    <div class="jf-job-main">
+                        <div class="jf-job-title">{esc(title)}</div>
+                        <div class="jf-job-company">{esc(company)}</div>
+                        {chips(meta)}
+                        {salary_html}
+                        {skills_html}
+                    </div>
+                </div>
+                """
+            )
 
             with st.expander("Lihat Detail Lowongan"):
                 description = clean(job["description"])
                 requirements = clean(job["requirements"])
-                skills = clean(job["skills"])
 
                 st.markdown("**Deskripsi Pekerjaan**")
                 st.write(
@@ -643,9 +672,11 @@ def run_user_dashboard():
                 )
 
                 st.markdown("**Keterampilan**")
-                st.write(
-                    skills or "Belum dicantumkan."
-                )
+
+                if skill_list:
+                    html_block(chips(skill_list, "amber"))
+                else:
+                    st.write("Belum dicantumkan.")
 
                 job_url = clean(job["job_url"])
 
@@ -653,6 +684,7 @@ def run_user_dashboard():
                     st.link_button(
                         "Lihat dan Lamar Lowongan",
                         job_url,
+                        type="primary",
                         use_container_width=True,
                     )
                 else:
@@ -666,7 +698,7 @@ def run_user_dashboard():
     # TOMBOL PAGINATION
     # ==========================================
     if total_pages > 1:
-        st.divider()
+        st.write("")
 
         prev_col, page_col, next_col = st.columns(
             [1, 2, 1]
@@ -683,7 +715,7 @@ def run_user_dashboard():
 
         with page_col:
             st.markdown(
-                f"<div style='text-align:center; padding-top:8px;'>"
+                f"<div class='jf-pager'>"
                 f"Halaman <b>{current_page}</b> dari "
                 f"<b>{total_pages}</b></div>",
                 unsafe_allow_html=True,

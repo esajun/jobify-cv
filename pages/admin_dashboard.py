@@ -1,5 +1,7 @@
 import streamlit as st
 
+from ui import page_header, stat_cards
+
 
 # ==========================================
 # HELPER
@@ -117,8 +119,12 @@ def make_job_payload(
 # ==========================================
 
 def run_admin_dashboard(client):
-    st.title("Dashboard Admin Jobify")
-    st.caption("Kelola katalog lowongan kerja.")
+    page_header(
+        "Dashboard",
+        "Admin",
+        "Kelola katalog lowongan kerja Jobify.",
+        badge="Admin",
+    )
 
     # Tampilkan notifikasi dari aksi sebelumnya
     show_flash_message()
@@ -151,11 +157,11 @@ def run_admin_dashboard(client):
 
     inactive_jobs = total_jobs - active_jobs
 
-    c1, c2, c3 = st.columns(3)
-
-    c1.metric("Total Lowongan", f"{total_jobs:,}")
-    c2.metric("Lowongan Aktif", f"{active_jobs:,}")
-    c3.metric("Lowongan Nonaktif", f"{inactive_jobs:,}")
+    stat_cards([
+        ("Total Lowongan", f"{total_jobs:,}", "seluruh katalog", "teal"),
+        ("Lowongan Aktif", f"{active_jobs:,}", "tampil untuk pengguna", "purple"),
+        ("Lowongan Nonaktif", f"{inactive_jobs:,}", "disembunyikan", "coral"),
+    ])
 
     tab_list, tab_add, tab_edit, tab_delete = st.tabs([
         "Daftar Lowongan",
@@ -177,7 +183,7 @@ def run_admin_dashboard(client):
 
         with refresh_col:
             if st.button(
-                "🔄 Refresh",
+                "Refresh",
                 key="refresh_job_list",
                 use_container_width=True,
             ):
