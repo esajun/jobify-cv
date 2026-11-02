@@ -98,10 +98,51 @@ def _tfidf_similarity(text_a: str, text_b: str) -> float:
     return float(cosine_similarity(vecs[0:1], vecs[1:2])[0][0])
 
 
+
 def _skill_overlap_ratio(candidate_skills: set, job_skills: set) -> float:
     if not job_skills:
         return 0.0
-    return len(candidate_skills & job_skills) / len(job_skills)
+
+    candidate_skills = {
+        skill.lower().strip() for skill in candidate_skills
+    }
+    job_skills = {
+        skill.lower().strip() for skill in job_skills
+    }
+
+    # Skill utama yang paling relevan untuk posisi desain grafis
+    core_skills = {
+        "graphic design",
+        "adobe photoshop",
+        "adobe illustrator",
+        "canva",
+        "typography",
+        "visual communication",
+        "layout design",
+    }
+
+    # Pisahkan skill utama dan skill tambahan
+    core_in_job = job_skills & core_skills
+    additional_in_job = job_skills - core_skills
+
+    # Jika tidak ada skill utama yang terdeteksi,
+    # gunakan perhitungan overlap biasa
+    if not core_in_job:
+        return len(candidate_skills & job_skills) / len(job_skills)
+
+    core_match = len(candidate_skills & core_in_job)
+    additional_match = len(candidate_skills & additional_in_job)
+
+    core_score = core_match / len(core_in_job)
+    additional_score = (
+        additional_match / len(additional_in_job)
+        if additional_in_job
+        else 0.0
+    )
+
+    # Skill utama berbobot 70%, skill tambahan 30%
+    return (core_score * 0.7) + (additional_score * 0.3)
+
 
 
 def predict_match_score(cv_text: str, cv_skills: list, job_text: str, job_skills: list) -> dict:
@@ -120,15 +161,12 @@ def predict_match_score(cv_text: str, cv_skills: list, job_text: str, job_skills
     overlap = _skill_overlap_ratio(cand_set, job_set)
     similarity = _tfidf_similarity(cv_text, job_text)
 
-    if _classifier is not None:
-        features = np.array([[overlap, similarity]])
-        proba = _classifier.predict_proba(features)[0][1]
-        final_score = round(float(proba) * 100, 2)
-        used_ml_model = True
-    else:
-        # fallback: rata-rata berbobot manual (60% skill overlap, 40% semantic)
-        final_score = round((overlap * 0.6 + similarity * 0.4) * 100, 2)
-        used_ml_model = False
+    # CV Screening: prioritaskan kemiripan isi CV dengan Job Description
+    final_score = round(
+        (overlap * 0.4 + similarity * 0.6) * 100,
+        2
+    )
+    used_ml_model = False
 
     return {
         "final_score": final_score,
@@ -173,12 +211,10 @@ def recommend_jobs(cv_text: str, cv_skills: list, top_n: int = 5) -> pd.DataFram
         matrix = fallback_vectorizer.fit_transform(corpus)
         similarities = cosine_similarity(matrix[0:1], matrix[1:])[0]
 
-    # --- Skor akhir (vectorized) ---
-    if _classifier is not None:
-        features = np.column_stack([overlaps, similarities])
-        scores = _classifier.predict_proba(features)[:, 1] * 100
-    else:
-        scores = (overlaps * 0.6 + similarities * 0.4) * 100
+    
+    # Skor Career Match berbobot
+    scores = (overlaps * 0.6 + similarities * 0.4) * 100
+
 
     display_cols = ["job_title", "company", "role_family", "location", "salary", "job_type", "education", "experience", "job_links", "description", "requirements"]
     display_cols = [c for c in display_cols if c in _jobs_df.columns]
