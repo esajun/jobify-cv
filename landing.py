@@ -44,6 +44,11 @@ def _open_auth(mode):
 
 def render_navbar(show_back=False):
     """Navbar atas: logo di kiri, tautan dan tombol Masuk di kanan."""
+    with st.container(key="topnav"):
+        _navbar_row(show_back)
+
+
+def _navbar_row(show_back):
     col_logo, col_links, col_btn = st.columns([4, 3, 1.3], vertical_alignment="center")
 
     with col_logo:
@@ -84,9 +89,11 @@ def render_landing():
 
     render_navbar()
 
-    st.write("")
-    st.write("")
+    with st.container(key="landing_body"):
+        _render_body(jobs_count, skills_count)
 
+
+def _render_body(jobs_count, skills_count):
     left, right = st.columns([1.05, 1], gap="large", vertical_alignment="center")
 
     # ---------------------- Kiri: teks hero ----------------------
@@ -99,7 +106,7 @@ def render_landing():
             """
         )
 
-        b1, b2, _ = st.columns([1.1, 1.1, 1.4])
+        b1, _ = st.columns([1.1, 2.5])
 
         with b1:
             st.button(
@@ -109,12 +116,6 @@ def render_landing():
                 use_container_width=True,
                 on_click=_open_auth,
                 args=("Daftar",),
-            )
-
-        with b2:
-            html_block(
-                "<a class='jf-cta-link' href='#fitur' "
-                "style='width:100%'>Lihat Demo</a>"
             )
 
         jobs_label = f"{jobs_count:,}+" if jobs_count else "Ribuan"

@@ -21,6 +21,7 @@ _CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
 
 :root {
+    color-scheme: only light;
     --jf-teal: #12A383;
     --jf-teal-dark: #0E8A6E;
     --jf-teal-soft: #E8F7F2;
@@ -39,6 +40,7 @@ _CSS = """
 }
 
 /* ---------- Dasar ---------- */
+html, body, .stApp { color-scheme: only light; }
 .stApp {
     background: var(--jf-bg);
     color: var(--jf-ink);
@@ -62,9 +64,22 @@ header[data-testid="stHeader"] {
 }
 .block-container {
     max-width: 1240px;
-    padding: 1.1rem 2rem 4rem !important;
+    padding: 1.4rem 2rem 4rem !important;
 }
 html { scroll-behavior: smooth; }
+
+/* Elemen yang hanya berisi <style> tidak boleh ikut memakan jarak antar-elemen */
+[data-testid="stElementContainer"]:has(style) { display: none; }
+
+/* Heading Streamlit membawa padding bawaan; dibuang agar jarak rapat */
+.stApp .jf-hero-title, .stApp .jf-page-head h1, .stApp .jf-section-head h2 { padding: 0; }
+.stApp h1.jf-hero-title { margin: 1rem 0 1.3rem; }
+.st-key-topnav [data-testid="stElementContainer"],
+.st-key-appnav [data-testid="stElementContainer"],
+.st-key-topnav [data-testid="stMarkdownContainer"],
+.st-key-appnav [data-testid="stMarkdownContainer"] { margin: 0 !important; }
+.st-key-appnav [data-testid="stHorizontalBlock"],
+.st-key-topnav [data-testid="stHorizontalBlock"] { align-items: center; }
 
 h1, h2, h3, h4 {
     color: var(--jf-ink);
@@ -232,7 +247,7 @@ hr { border-color: var(--jf-line) !important; }
 .jf-logo {
     display: flex; align-items: center; gap: 10px;
     font-weight: 800; font-size: 1.15rem; color: var(--jf-ink);
-    letter-spacing: -0.01em; height: 2.9rem;
+    letter-spacing: -0.01em;
 }
 .jf-logo-mark {
     width: 32px; height: 32px; border-radius: 9px;
@@ -241,7 +256,7 @@ hr { border-color: var(--jf-line) !important; }
 }
 .jf-navlinks {
     display: flex; justify-content: flex-end; align-items: center;
-    gap: 26px; height: 2.9rem; padding-right: 18px;
+    gap: 26px; padding-right: 18px;
 }
 .jf-navlinks a {
     color: var(--jf-ink) !important; text-decoration: none !important;
@@ -289,8 +304,7 @@ hr { border-color: var(--jf-line) !important; }
     background: var(--jf-coral-soft); border-color: var(--jf-coral); color: #D64545;
 }
 .jf-user {
-    display: flex; align-items: center; justify-content: flex-end; gap: 10px;
-    height: 2.6rem; font-weight: 600; font-size: 0.9rem;
+    display: flex; align-items: center; justify-content: flex-end; gap: 10px; font-weight: 600; font-size: 0.9rem;
 }
 .jf-avatar {
     width: 34px; height: 34px; border-radius: 50%;
@@ -303,6 +317,7 @@ hr { border-color: var(--jf-line) !important; }
 }
 
 /* ---------- Hero ---------- */
+.st-key-landing_body { padding-top: 1.6rem; }
 .jf-badge {
     display: inline-flex; align-items: center; gap: 8px;
     background: var(--jf-teal-soft); color: var(--jf-teal-dark);
@@ -326,15 +341,6 @@ hr { border-color: var(--jf-line) !important; }
 .jf-stats { display: flex; gap: 2.2rem; margin-top: 1.9rem; }
 .jf-stat-num { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; }
 .jf-stat-lbl { font-size: 0.8rem; color: var(--jf-muted); }
-
-.jf-cta-link {
-    display: inline-flex; align-items: center; justify-content: center;
-    min-height: 2.9rem; padding: 0.55rem 1.5rem; border-radius: 12px;
-    border: 1.5px solid var(--jf-ink); background: #fff;
-    color: var(--jf-ink) !important; font-weight: 600; font-size: 0.95rem;
-    text-decoration: none !important; transition: all .15s ease;
-}
-.jf-cta-link:hover { background: var(--jf-ink); color: #fff !important; transform: translateY(-1px); }
 
 .jf-float-wrap { position: relative; height: 470px; max-width: 560px; margin-left: auto; }
 .jf-fcard {
@@ -469,7 +475,7 @@ hr { border-color: var(--jf-line) !important; }
 
 .jf-section-title {
     display: flex; align-items: center; gap: 10px;
-    font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; margin: 1.6rem 0 0.8rem;
+    font-size: 1.25rem; font-weight: 800; letter-spacing: -0.02em; margin: 1rem 0 0.5rem;
 }
 .jf-section-title::before {
     content: ""; width: 8px; height: 24px; border-radius: 4px; background: var(--jf-teal);

@@ -1,0 +1,15 @@
+# Tema dikunci terang, tidak mengikuti tema browser.
+[theme]
+base = "light"
+primaryColor = "#12A383"
+backgroundColor = "#F6F8FC"
+secondaryBackgroundColor = "#EEF2F8"
+textColor = "#1A1D2E"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"
+showSidebarNavigation = false
+
+[browser]
+gatherUsageStats = false
