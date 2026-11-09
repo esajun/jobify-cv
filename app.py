@@ -573,7 +573,7 @@ else:
 
     with st.container(key="appnav"):
         nav1, nav2, nav3, nav4 = st.columns(
-            [1.5, 4.2, 2.2, 1], vertical_alignment="center"
+            [1.5, 4.0, 3.0, 1], vertical_alignment="center"
         )
 
         with nav1:
@@ -598,7 +598,27 @@ else:
                         st.rerun()
 
         with nav3:
-            user_chip(user.get("full_name", "User"), "Pencari Kerja")
+            # Chip profil (avatar + nama + peran) berfungsi sebagai tombol
+            # menuju halaman Profil. Inisial & peran dipasang lewat CSS.
+            profile_name = user.get("full_name", "User")
+            raw_initial = (profile_name or "U").strip()[:1].upper()
+            profile_initial = raw_initial if raw_initial.isalnum() else "U"
+
+            st.markdown(
+                "<style>.st-key-nav_profile{"
+                f'--jf-initial:"{profile_initial}";'
+                '--jf-role:"Pencari Kerja";}</style>',
+                unsafe_allow_html=True,
+            )
+
+            if st.button(
+                profile_name,
+                key="nav_profile",
+                help="Buka halaman Profil",
+                use_container_width=True,
+            ):
+                st.session_state["user_page"] = "profile"
+                st.rerun()
 
         with nav4:
             if st.button(
@@ -631,3 +651,8 @@ else:
         from pages.career_match import run_career_match
 
         run_career_match()
+
+    elif current_page == "profile":
+        from pages.profile import run_profile
+
+        run_profile()

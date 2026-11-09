@@ -85,6 +85,57 @@ def skill_chips(skills, empty_message, tone):
     return chips(items, tone)
 
 
+PAGE_SIZE = 20
+
+
+def paginate(items, key):
+    """Ambil potongan data untuk halaman aktif. Return (items, offset)."""
+    total_pages = max(1, (len(items) + PAGE_SIZE - 1) // PAGE_SIZE)
+    page = max(1, min(st.session_state.get(f"page_{key}", 1), total_pages))
+    offset = (page - 1) * PAGE_SIZE
+    return items[offset:offset + PAGE_SIZE], offset
+
+
+def pager(key, total_items):
+    """Tombol Sebelumnya / Berikutnya untuk daftar rekomendasi."""
+    total_pages = (total_items + PAGE_SIZE - 1) // PAGE_SIZE
+
+    if total_pages <= 1:
+        return
+
+    state_key = f"page_{key}"
+    page = max(1, min(st.session_state.get(state_key, 1), total_pages))
+
+    prev_col, page_col, next_col = st.columns([1, 2, 1])
+
+    with prev_col:
+        if st.button(
+            "← Sebelumnya",
+            disabled=page <= 1,
+            use_container_width=True,
+            key=f"prev_{key}",
+        ):
+            st.session_state[state_key] = page - 1
+            st.rerun()
+
+    with page_col:
+        st.markdown(
+            f"<div class='jf-pager'>Halaman <b>{page}</b> dari "
+            f"<b>{total_pages}</b></div>",
+            unsafe_allow_html=True,
+        )
+
+    with next_col:
+        if st.button(
+            "Berikutnya →",
+            disabled=page >= total_pages,
+            use_container_width=True,
+            key=f"next_{key}",
+        ):
+            st.session_state[state_key] = page + 1
+            st.rerun()
+
+
 def display_job_detail(row, rank=None):
     """Menampilkan detail satu lowongan beserta skor kecocokannya."""
     title = row.get("job_title") or "Lowongan"
@@ -229,9 +280,15 @@ def display_history_item(item, index):
 
         with st.expander("Lihat rekomendasi sebelumnya"):
             if recommendations:
-                for i, job in enumerate(recommendations, start=1):
+                page_items, offset = paginate(
+                    recommendations, f"history_{index}"
+                )
+
+                for i, job in enumerate(page_items, start=offset + 1):
                     with st.container(border=True):
                         display_job_detail(job, rank=i)
+
+                pager(f"history_{index}", len(recommendations))
             else:
                 st.info("Detail rekomendasi tidak tersedia.")
 
@@ -246,29 +303,17 @@ def run_career_match():
     )
 
     with st.container(border=True, key="card_upload"):
-        col_upload, col_options = st.columns([3, 2], gap="large")
+        uploaded_cv = st.file_uploader(
+            "Upload CV (PDF)",
+            type=["pdf"],
+            key="career_cv",
+        )
 
-        with col_upload:
-            uploaded_cv = st.file_uploader(
-                "Upload CV (PDF)",
-                type=["pdf"],
-                key="career_cv",
-            )
-
-        with col_options:
-            top_n = st.slider(
-                "Jumlah rekomendasi",
-                min_value=3,
-                max_value=15,
-                value=5,
-                key="top_n",
-            )
-
-            search_clicked = st.button(
-                "Cari Lowongan Cocok",
-                type="primary",
-                use_container_width=True,
-            )
+        search_clicked = st.button(
+            "Cari Lowongan Cocok",
+            type="primary",
+            use_container_width=True,
+        )
 
     # =========================================================
     # CARI LOWONGAN DAN SIMPAN OTOMATIS
@@ -288,6 +333,7 @@ def run_career_match():
 
             # Hapus hasil sebelumnya agar tidak tertukar
             st.session_state.pop("career_match_result", None)
+            st.session_state["page_match_result"] = 1
 
             try:
                 with st.spinner("Mencari lowongan paling cocok..."):
@@ -312,14 +358,13 @@ def run_career_match():
                         recommendations = ml_model.recommend_jobs(
                             cv_text,
                             cv_skills,
-                            top_n=top_n,
+                            top_n=None,
                         )
 
                         if recommendations.empty:
                             st.session_state["career_match_result"] = {
                                 "cv_filename": uploaded_cv.name,
                                 "recommendations": [],
-                                "top_n": top_n,
                             }
                             st.info(
                                 "Belum ditemukan rekomendasi lowongan."
@@ -337,7 +382,6 @@ def run_career_match():
                             result_data = {
                                 "cv_filename": uploaded_cv.name,
                                 "recommendations": recommendation_list,
-                                "top_n": int(top_n),
                             }
 
                             # Simpan hasil agar tetap tampil saat rerun
@@ -364,13 +408,23 @@ def run_career_match():
                                     ).insert({
                                         "user_id": user_id,
                                         "cv_filename": uploaded_cv.name,
-                                        "top_n": int(top_n),
+                                        "top_n": len(
+                                            recommendation_list
+                                        ),
                                         "total_recommendations": len(
                                             recommendation_list
                                         ),
-                                        "recommendations": (
-                                            recommendation_list
-                                        ),
+                                        "recommendations": [
+                                            {
+                                                k: v
+                                                for k, v in rec.items()
+                                                if k not in (
+                                                    "description",
+                                                    "requirements",
+                                                )
+                                            }
+                                            for rec in recommendation_list
+                                        ],
                                     }).execute()
 
                                 except Exception:
@@ -394,17 +448,23 @@ def run_career_match():
 
     if result_data:
         recommendations = result_data.get("recommendations", [])
-        result_top_n = result_data.get("top_n", top_n)
-
-        section_title(f"Top {result_top_n} Lowongan Paling Cocok")
+        section_title(
+            f"{len(recommendations):,} Lowongan Cocok dengan CV-mu"
+        )
 
         if recommendations:
-            for index, row in enumerate(recommendations, start=1):
+            page_items, offset = paginate(
+                recommendations, "match_result"
+            )
+
+            for index, row in enumerate(page_items, start=offset + 1):
                 with st.container(
                     border=True,
                     key=f"card_match_{index}",
                 ):
                     display_job_detail(row, rank=index)
+
+            pager("match_result", len(recommendations))
 
             html_block(
                 "<div class='jf-info'>Rekomendasi dibuat otomatis "

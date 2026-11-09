@@ -316,6 +316,37 @@ hr { border-color: var(--jf-line) !important; }
     border-radius: 999px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700;
 }
 
+/* Chip profil di navbar: avatar + nama + peran, seluruhnya tombol ke halaman Profil */
+.st-key-appnav .st-key-nav_profile {
+    display: flex; justify-content: flex-end; width: 100%;
+}
+.st-key-appnav .st-key-nav_profile button {
+    width: auto !important; display: inline-flex; align-items: center; justify-content: flex-start;
+    gap: 10px; padding: 0.25rem 0.9rem 0.25rem 0.3rem; border-radius: 999px;
+    background: transparent !important; border: none !important; box-shadow: none !important;
+    color: var(--jf-ink) !important; min-height: 2.6rem;
+}
+.st-key-appnav .st-key-nav_profile button:hover { background: var(--jf-teal-soft) !important; }
+.st-key-appnav .st-key-nav_profile button > div {
+    flex: none !important; width: auto !important; margin: 0 !important; order: 1;
+}
+.st-key-appnav .st-key-nav_profile button p {
+    font-weight: 600; font-size: 0.9rem; margin: 0; text-align: left;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 10rem;
+}
+.st-key-appnav .st-key-nav_profile button::before {
+    content: var(--jf-initial, "U");
+    flex: none; order: 0; width: 34px; height: 34px; border-radius: 50%;
+    background: var(--jf-teal); color: #fff;
+    display: grid; place-items: center; font-weight: 700; font-size: 0.9rem;
+}
+.st-key-appnav .st-key-nav_profile button::after {
+    content: var(--jf-role, "");
+    flex: none; order: 2;
+    background: var(--jf-lav); color: var(--jf-purple);
+    border-radius: 999px; padding: 4px 12px; font-size: 0.75rem; font-weight: 700;
+}
+
 /* ---------- Hero ---------- */
 .st-key-landing_body { padding-top: 1.6rem; }
 .jf-badge {

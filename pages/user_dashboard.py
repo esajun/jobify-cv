@@ -1,4 +1,6 @@
 
+import time
+
 import streamlit as st
 import pandas as pd
 
@@ -16,6 +18,48 @@ from ui import (
 
 
 PAGE_SIZE = 20
+CACHE_TTL_SECONDS = 300
+
+
+def load_all_jobs(client):
+    """Muat seluruh lowongan aktif secara bertahap.
+
+    Hasil disimpan di session_state selama 5 menit supaya perpindahan
+    halaman pagination tidak memanggil database berulang kali.
+    """
+    cache = st.session_state.get("jobs_cache")
+
+    if cache and time.time() - cache["time"] < CACHE_TTL_SECONDS:
+        return cache["data"]
+
+    all_jobs = []
+    start = 0
+    batch_size = 500
+
+    while True:
+        response = (
+            client.table("jobs")
+            .select("*")
+            .eq("is_active", True)
+            .order("id", desc=True)
+            .range(start, start + batch_size - 1)
+            .execute()
+        )
+
+        batch = response.data or []
+        all_jobs.extend(batch)
+
+        if len(batch) < batch_size:
+            break
+
+        start += batch_size
+
+    st.session_state["jobs_cache"] = {
+        "time": time.time(),
+        "data": all_jobs,
+    }
+
+    return all_jobs
 
 
 def run_user_dashboard():
@@ -31,60 +75,10 @@ def run_user_dashboard():
     )
 
     # ==========================================
-    # PILIHAN TAMPILAN
-    # ==========================================
-    show_all_jobs = st.checkbox(
-        "Cari dan filter seluruh lowongan",
-        value=False,
-        help=(
-            "Aktifkan untuk mencari lowongan dari seluruh "
-            "data yang tersedia."
-        ),
-        key="show_all_jobs",
-    )
-
-    # ==========================================
-    # AMBIL DATA DARI SUPABASE
+    # AMBIL SELURUH LOWONGAN AKTIF DARI SUPABASE
     # ==========================================
     try:
-        if show_all_jobs:
-            # Muat seluruh lowongan aktif secara bertahap
-            all_jobs = []
-            start = 0
-            batch_size = 500
-
-            while True:
-                response = (
-                    client.table("jobs")
-                    .select("*")
-                    .eq("is_active", True)
-                    .order("id", desc=True)
-                    .range(start, start + batch_size - 1)
-                    .execute()
-                )
-
-                batch = response.data or []
-                all_jobs.extend(batch)
-
-                if len(batch) < batch_size:
-                    break
-
-                start += batch_size
-
-            jobs = pd.DataFrame(all_jobs)
-
-        else:
-            # Tampilan awal hanya mengambil 20 lowongan terbaru
-            response = (
-                client.table("jobs")
-                .select("*")
-                .eq("is_active", True)
-                .order("id", desc=True)
-                .limit(PAGE_SIZE)
-                .execute()
-            )
-
-            jobs = pd.DataFrame(response.data or [])
+        jobs = pd.DataFrame(load_all_jobs(client))
 
     except Exception as e:
         st.error(f"Gagal mengambil data lowongan: {e}")
@@ -524,10 +518,9 @@ def run_user_dashboard():
 
     stat_cards([
         (
-            "Lowongan Dimuat" if show_all_jobs else "Lowongan Terbaru",
+            "Total Lowongan",
             f"{len(jobs):,}",
-            "seluruh lowongan aktif" if show_all_jobs
-            else "20 lowongan terbaru",
+            "seluruh lowongan aktif",
             "teal",
         ),
         (
@@ -544,12 +537,6 @@ def run_user_dashboard():
         ),
     ])
 
-    if not show_all_jobs:
-        st.caption(
-            "Menampilkan 20 lowongan terbaru. Aktifkan pilihan "
-            "pencarian seluruh lowongan untuk melihat lainnya."
-        )
-
     if filtered.empty:
         st.markdown(
             "<div class='jf-empty'><b>Lowongan tidak ditemukan.</b><br>"
@@ -564,7 +551,6 @@ def run_user_dashboard():
 
     # Reset ke halaman pertama saat filter berubah
     filter_signature = (
-        show_all_jobs,
         keyword.strip(),
         selected_location,
         selected_type,

@@ -176,7 +176,7 @@ def predict_match_score(cv_text: str, cv_skills: list, job_text: str, job_skills
     }
 
 
-def recommend_jobs(cv_text: str, cv_skills: list, top_n: int = 5) -> pd.DataFrame:
+def recommend_jobs(cv_text: str, cv_skills: list, top_n: "int | None" = None) -> pd.DataFrame:
     """
     Meranking seluruh lowongan di katalog (data/jobs_processed.csv) berdasarkan
     kecocokan dengan CV, memakai model yang sama dengan CV Screening.
@@ -184,6 +184,9 @@ def recommend_jobs(cv_text: str, cv_skills: list, top_n: int = 5) -> pd.DataFram
     Returns:
         DataFrame kolom: job_title, company, role_family, match_score,
         matched_skills, missing_skills — diurutkan dari skor tertinggi.
+
+    Jika top_n None (default), seluruh lowongan yang cocok dengan CV
+    (minimal satu skill yang sama) dikembalikan tanpa batas jumlah.
     """
     _load_artifacts()
 
@@ -228,4 +231,9 @@ def recommend_jobs(cv_text: str, cv_skills: list, top_n: int = 5) -> pd.DataFram
     ]
 
     result_df = result_df.sort_values("match_score", ascending=False)
+
+    if top_n is None:
+        has_match = result_df["matched_skills"].apply(len) > 0
+        return result_df[has_match].reset_index(drop=True)
+
     return result_df.head(top_n).reset_index(drop=True)

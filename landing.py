@@ -68,7 +68,6 @@ def _navbar_row(show_back):
         html_block(
             """
             <div class="jf-navlinks">
-                <a href="#fitur">Fitur</a>
                 <a href="#tentang">Tentang</a>
             </div>
             """
