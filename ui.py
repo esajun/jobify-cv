@@ -8,8 +8,11 @@ Palet warna mengikuti referensi desain:
 teal (utama), coral, ungu, dan krem dengan latar biru-abu sangat muda.
 """
 
+import base64
+import functools
 import html
 import json
+import os
 
 import streamlit as st
 
@@ -668,10 +671,36 @@ def text_to_html(text):
     return esc(text).replace("\r\n", "\n").replace("\n", "<br>")
 
 
+_LOGO_PATH = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "assets", "logo.png"
+)
+
+
+@functools.lru_cache(maxsize=1)
+def _logo_data_uri():
+    """Logo dibaca sekali lalu disematkan sebagai data URI base64."""
+    try:
+        with open(_LOGO_PATH, "rb") as f:
+            return "data:image/png;base64," + base64.b64encode(f.read()).decode()
+    except OSError:
+        return ""
+
+
 def logo():
+    uri = _logo_data_uri()
+
+    # Cadangan teks bila file assets/logo.png tidak ditemukan
+    if not uri:
+        return (
+            "<div class='jf-logo'><span class='jf-logo-mark'>J</span>"
+            "<span>Jobify</span></div>"
+        )
+
     return (
-        "<div class='jf-logo'><span class='jf-logo-mark'>J</span>"
-        "<span>Jobify</span></div>"
+        "<div class='jf-logo'>"
+        f"<img src='{uri}' alt='Jobify' "
+        "style='height:44px;width:auto;display:block'>"
+        "</div>"
     )
 
 

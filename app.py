@@ -1,3 +1,4 @@
+import os
 import json
 import streamlit as st
 
@@ -13,9 +14,24 @@ from auth import (
 from landing import render_landing, render_navbar
 from ui import esc, html_block, inject_css, logo
 
+def _load_favicon():
+    """Ikon tab browser dari assets/favicon.png (cadangan: emoji)."""
+    try:
+        from PIL import Image
+
+        path = os.path.join(
+            os.path.dirname(os.path.abspath(__file__)),
+            "assets",
+            "favicon.png",
+        )
+        return Image.open(path)
+    except Exception:
+        return "💼"
+
+
 st.set_page_config(
     page_title="Jobify - Career Match",
-    page_icon="💼",
+    page_icon=_load_favicon(),
     layout="wide",
     initial_sidebar_state="collapsed",
 )
